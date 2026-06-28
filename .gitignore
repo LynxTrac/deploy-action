@@ -78,9 +78,12 @@ web_modules/
 .next
 out
 
+# NOTE: This is a JavaScript GitHub Action — the bundled `dist/` MUST be committed so the
+# action runs without an install step. Do NOT ignore it. (`.vuepress/dist` / `.vitepress/dist`
+# docs output below stay ignored.) Rebuild with `npm run build` after changing `src/`.
+
 # Nuxt.js build / generate output
 .nuxt
-dist
 .output
 
 # Gatsby files
