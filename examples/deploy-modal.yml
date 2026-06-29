@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Register LynxTrac release (deploy-modal)
-        uses: bees-tracker/trigger-deploy@v1
+        uses: LynxTrac/deploy-action@v1
         with:
           apikey: ${{ secrets.LYNXTRAC_API_KEY }}
           lynxserver: 'beta'

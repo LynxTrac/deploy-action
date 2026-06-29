@@ -135,3 +135,42 @@ test('buildRequest: rejects bad apikey / version / missing blueprint', () => {
   );
   assert.throws(() => buildRequest({ apikey: 'apikey-123', version: '1.0.0' }), /blueprint is required/);
 });
+
+test('resolveServerUrl: local/dev aliases point at localhost', () => {
+  assert.strictEqual(resolveServerUrl('local'), 'http://localhost:5566');
+  assert.strictEqual(resolveServerUrl('dev'), 'http://localhost:5566');
+});
+
+test('resolveServerUrl: rejects a non-http(s) URL / unknown alias', () => {
+  assert.throws(() => resolveServerUrl('ftp://files.example.com'), /Invalid lynxserver/);
+  assert.throws(() => resolveServerUrl('staging-typo'), /Invalid lynxserver/);
+});
+
+test('buildRequest: rejects array artifacts (top-level must be an object map)', () => {
+  assert.throws(
+    () => buildRequest({ apikey: 'apikey-123', blueprint: 'bp', version: '1.0.0', artifactsRaw: '[]' }),
+    /artifacts must be a JSON object/,
+  );
+});
+
+test('buildRequest: warns when sending the key off the lynxtrac.com domain', () => {
+  const { warnings } = buildRequest({
+    apikey: 'apikey-123',
+    lynxserver: 'https://evil.example.com',
+    blueprint: 'bp',
+    version: '1.0.0',
+    artifactsRaw: '{}',
+  });
+  assert.ok(warnings.some((w) => /not a lynxtrac\.com domain/.test(w)));
+});
+
+test('buildRequest: no off-domain warning for localhost (dev)', () => {
+  const { warnings } = buildRequest({
+    apikey: 'apikey-123',
+    lynxserver: 'local',
+    blueprint: 'bp',
+    version: '1.0.0',
+    artifactsRaw: '{}',
+  });
+  assert.ok(!warnings.some((w) => /not a lynxtrac\.com domain/.test(w)));
+});

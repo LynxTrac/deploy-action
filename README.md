@@ -4,15 +4,17 @@ Register a **LynxTrac release** straight from your CI pipeline. The action takes
 inputs — a deployment **blueprint** code, a **version**, and the build's **artifact links** — and
 calls LynxTrac to create the release (version + tasks + files) for you.
 
-> **What this does (and does not) do in v1**
-> It **registers a release** in LynxTrac. It does **not** deploy to any devices — a human still
-> reviews and approves the rollout inside LynxTrac. See [Known limitations](#known-limitations).
+> **What this does**
+> It creates a **release** in LynxTrac from a blueprint and **auto-approves** it. If the product has
+> a configured on-demand rollout, approval triggers it (a deployment request is created). If no
+> rollout is configured, the release is created + approved and nothing deploys. See
+> [Behavior & limitations](#behavior--limitations).
 
 ## Quick start
 
 ```yaml
 - name: Register LynxTrac release
-  uses: bees-tracker/trigger-deploy@v1
+  uses: LynxTrac/deploy-action@v1
   with:
     apikey: ${{ secrets.LYNXTRAC_API_KEY }}
     lynxserver: ''                 # '' -> app.lynxtrac.com (production)
@@ -33,7 +35,7 @@ blueprint in LynxTrac and use **Preview → Copy YAML** to generate this block w
 | Input | Required | Description |
 |---|---|---|
 | `apikey` | ✅ | LynxTrac API key. Sent as `Authorization: Api-Key <key>`. **Store it as a secret.** |
-| `lynxserver` | | Target server. Empty → `app.lynxtrac.com`. Aliases: `app`, `beta`, `qa` → `<alias>.lynxtrac.com`. Or a full `http(s)` URL for local/dev. |
+| `lynxserver` | | Target server. Empty → `app.lynxtrac.com`. Aliases: `app`/`beta`/`qa` → `<alias>.lynxtrac.com`, `local`/`dev` → `http://localhost:5566`. Or a full `http(s)` URL. |
 | `blueprint` | | Release blueprint code (holds the release structure). Required unless supplied via `deploy-modal`. |
 | `version` | | Semver version for the release (e.g. `2.5.0`). |
 | `artifacts` | | JSON object mapping blueprint slot keys to a value. Each value is either a link string, or an object `{ "link": "...", "checksum": "...", "checksumType": "sha256" }` to also record an integrity hash. SFTP/FTP slots take the remote path instead of a URL. |
@@ -49,7 +51,7 @@ blueprint in LynxTrac and use **Preview → Copy YAML** to generate this block w
 |---|---|
 | `release-id` | ID of the created (or already-existing) release. |
 | `status` | `CREATED` \| `ALREADY_EXISTS` \| `VALIDATION_FAILED`. |
-| `release-status` | Release lifecycle status (v1: `REQUESTED` — awaiting approval). |
+| `release-status` | Release lifecycle status — `APPROVED` after a successful trigger. |
 | `created` | JSON `{ tasks, files }` counts created. |
 | `slots` | JSON map of resolved `slot_key -> link`. |
 
@@ -58,7 +60,7 @@ blueprint in LynxTrac and use **Preview → Copy YAML** to generate this block w
 If you prefer a single JSON blob, use `deploy-modal` instead of the named inputs:
 
 ```yaml
-- uses: bees-tracker/trigger-deploy@v1
+- uses: LynxTrac/deploy-action@v1
   with:
     apikey: ${{ secrets.LYNXTRAC_API_KEY }}
     lynxserver: 'beta'
@@ -81,21 +83,25 @@ call returns `status: ALREADY_EXISTS` with the existing `release-id` and creates
 - empty / `app` → `https://app.lynxtrac.com` (production)
 - `beta` → `https://beta.lynxtrac.com`
 - `qa` → `https://qa.lynxtrac.com`
-- a full `http(s)` URL → used as-is (local/dev testing)
+- `local` / `dev` → `http://localhost:5566` (local backend)
+- a full `http(s)` URL → used as-is (the action warns if the host isn't `*.lynxtrac.com`/localhost, since it sends the API key there)
 
 Unknown short names are rejected — use one of the aliases above or a full URL.
 
-## Known limitations
+## Behavior & limitations
 
-This initial version intentionally scopes to **release registration**:
+- The release is created and **auto-approved**. Whether anything **deploys** is gated by admin
+  config: deployment happens only if the product has a configured **on-demand rollout** (which
+  approval triggers → a deployment request). No rollout configured ⇒ created + approved, no deploy.
+- **Sources:** `DIRECT_LINK` (slot value = http(s) URL), `SFTP`/`FTP` (slot value = remote path).
+  `DIRECT_UPLOAD` is not supported from CI.
+- **Checksums:** optional, via `{ "link": "...", "checksum": "...", "checksumType": "sha256" }`.
+- **Not yet supported:** variable-count file slots (one file per slot); `HOTFIX`/`REMOTE_SCRIPT`.
+- Re-running a version whose release exists but was **not** approved will re-attempt approval
+  (self-healing); an already-approved version is a safe `ALREADY_EXISTS` no-op.
 
-- It does **not** create a deployment request or roll out to devices — approval/rollout happens in
-  LynxTrac.
-- `artifacts` is **link-only** (each slot → one URL). Variable-count file slots and CI-supplied
-  checksums are not yet supported.
-- The release is created as `REQUESTED` (no auto-approval from CI).
-
-More examples live in [`examples/`](examples/).
+More examples live in [`examples/`](examples/). See the server repo's
+`docs/lt-8787-ci-deploy-known-limitations.md` for the full matrix.
 
 ## Development
 

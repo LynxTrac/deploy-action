@@ -14,6 +14,8 @@ const SERVER_ALIASES = {
   app: 'https://app.lynxtrac.com',
   beta: 'https://beta.lynxtrac.com',
   qa: 'https://qa.lynxtrac.com',
+  local: 'http://localhost:5566', // local backend for dev testing
+  dev: 'http://localhost:5566',
 };
 
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -145,7 +147,20 @@ function buildRequest(inputs) {
     throw new Error('artifacts must be a JSON object mapping slot_key -> link.');
   }
 
-  const url = `${resolveServerUrl(lynxserver)}/api/external/deploy/release`;
+  const baseUrl = resolveServerUrl(lynxserver);
+  const url = `${baseUrl}/api/external/deploy/release`;
+
+  // Warn if the API key is about to be sent somewhere other than *.lynxtrac.com (or localhost) —
+  // a typo'd/tampered full-URL lynxserver would otherwise leak the key silently.
+  try {
+    const host = new URL(baseUrl).hostname;
+    const trusted = host === 'lynxtrac.com' || host.endsWith('.lynxtrac.com') || host === 'localhost' || host === '127.0.0.1';
+    if (!trusted) {
+      warnings.push(`lynxserver host '${host}' is not a lynxtrac.com domain — sending the API key there.`);
+    }
+  } catch {
+    // baseUrl is always a valid URL by construction; ignore.
+  }
 
   const body = { blueprint: merged.blueprint, version: merged.version, artifacts };
   if (merged.releaseName) {

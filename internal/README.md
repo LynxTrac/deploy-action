@@ -1,7 +1,7 @@
 # Internal — maintainer-only
 
 > ⚠️ **Not part of the action's public usage surface.** External users of this action can ignore
-> this entire folder. Nothing here is needed to *use* `bees-tracker/trigger-deploy`.
+> this entire folder. Nothing here is needed to *use* `LynxTrac/deploy-action`.
 
 This folder holds the **internal development & end-to-end (E2E) harness** for the action's
 maintainers. It exercises the real trigger flow — *source repo → workflow → action → backend* —

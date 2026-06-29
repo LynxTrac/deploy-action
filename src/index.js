@@ -9,28 +9,36 @@ const { buildRequest } = require('./lib');
  * Reads inputs, builds the request (validation in lib.js), POSTs to the LynxTrac backend
  * deploy-trigger endpoint, maps the structured response to action outputs, and fails the
  * step on any non-2xx with the backend's stable error code surfaced to the workflow log.
+ *
+ * `coreApi` and `fetchApi` are injectable so this can be unit-tested without a runner.
  */
-async function run() {
+async function run({ coreApi = core, fetchApi = fetch } = {}) {
   try {
     const inputs = {
-      apikey: core.getInput('apikey', { required: true }),
-      lynxserver: core.getInput('lynxserver'),
-      blueprint: core.getInput('blueprint'),
-      version: core.getInput('version'),
-      artifactsRaw: core.getInput('artifacts'),
-      releaseName: core.getInput('release-name'),
-      description: core.getInput('description'),
-      deployModalRaw: core.getInput('deploy-modal'),
-      commit: core.getInput('commit') || process.env.GITHUB_SHA || '',
-      branch: core.getInput('branch') || process.env.GITHUB_REF_NAME || process.env.GITHUB_REF || '',
+      apikey: coreApi.getInput('apikey', { required: true }),
+      lynxserver: coreApi.getInput('lynxserver'),
+      blueprint: coreApi.getInput('blueprint'),
+      version: coreApi.getInput('version'),
+      artifactsRaw: coreApi.getInput('artifacts'),
+      releaseName: coreApi.getInput('release-name'),
+      description: coreApi.getInput('description'),
+      deployModalRaw: coreApi.getInput('deploy-modal'),
+      commit: coreApi.getInput('commit') || process.env.GITHUB_SHA || '',
+      branch: coreApi.getInput('branch') || process.env.GITHUB_REF_NAME || process.env.GITHUB_REF || '',
     };
 
+    // Defense-in-depth: scrub the API key from logs even if it was passed as a plain input or
+    // echoed back in a backend error body.
+    if (inputs.apikey) {
+      coreApi.setSecret(inputs.apikey);
+    }
+
     const { url, headers, body, warnings } = buildRequest(inputs);
-    warnings.forEach((w) => core.warning(w));
+    warnings.forEach((w) => coreApi.warning(w));
 
-    core.info(`LynxTrac deploy trigger -> ${url} (blueprint=${body.blueprint}, version=${body.version})`);
+    coreApi.info(`LynxTrac deploy trigger -> ${url} (blueprint=${body.blueprint}, version=${body.version})`);
 
-    const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    const response = await fetchApi(url, { method: 'POST', headers, body: JSON.stringify(body) });
     const text = await response.text();
 
     let data;
@@ -41,34 +49,39 @@ async function run() {
     }
 
     if (data.release_id !== undefined && data.release_id !== null) {
-      core.setOutput('release-id', String(data.release_id));
+      coreApi.setOutput('release-id', String(data.release_id));
     }
     if (data.status) {
-      core.setOutput('status', data.status);
+      coreApi.setOutput('status', data.status);
     }
     if (data.release_status) {
-      core.setOutput('release-status', data.release_status);
+      coreApi.setOutput('release-status', data.release_status);
     }
     if (data.created) {
-      core.setOutput('created', JSON.stringify(data.created));
+      coreApi.setOutput('created', JSON.stringify(data.created));
     }
     if (data.slots) {
-      core.setOutput('slots', JSON.stringify(data.slots));
+      coreApi.setOutput('slots', JSON.stringify(data.slots));
     }
 
     if (!response.ok) {
       const code = data.code ? ` [${data.code}]` : '';
-      core.setFailed(`LynxTrac deploy failed (HTTP ${response.status})${code}: ${data.message || text || 'no body'}`);
+      coreApi.setFailed(`LynxTrac deploy failed (HTTP ${response.status})${code}: ${data.message || text || 'no body'}`);
       return;
     }
 
-    core.info(
+    coreApi.info(
       `LynxTrac deploy ${data.status || 'OK'}: release ${data.release_id ?? '?'} ` +
         `(status=${data.release_status || '-'}, created=${JSON.stringify(data.created || {})}).`,
     );
   } catch (err) {
-    core.setFailed(err.message);
+    coreApi.setFailed(err.message);
   }
 }
 
-run();
+// Only auto-run when invoked directly (so the function can be unit-tested without firing).
+if (require.main === module) {
+  run();
+}
+
+module.exports = { run };

@@ -19,7 +19,7 @@ jobs:
 
       - name: Register LynxTrac release
         id: lynxtrac
-        uses: bees-tracker/trigger-deploy@v1
+        uses: LynxTrac/deploy-action@v1
         with:
           apikey: ${{ secrets.LYNXTRAC_API_KEY }}
           # lynxserver: ''            # default -> app.lynxtrac.com (production)
