@@ -5,4 +5,4 @@ process.env.INPUT_DEPLOYMENT_REQUEST = JSON.stringify({
   deploymentModel: 'LRT12'
 });
 
-require('./dist/index');
+require('../dist/index');
