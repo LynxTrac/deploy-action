@@ -19,7 +19,7 @@ jobs:
           version: '1.0.0'
           artifacts: |
             {
-              "lh99_f1": "https://lynxtrac-dev.s3.dualstack.us-east-1.amazonaws.com/qa/latest.zip?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIA6H6SIDWTMH3DGUPY/20260629/us-east-1/s3/aws4_request&X-Amz-Date=20260629T103021Z&X-Amz-Expires=86397&X-Amz-SignedHeaders=host&X-Amz-Signature=e390c87066c994d2a78fb48138fe557046f5cfc0e389a0f65e29ab926f3177f9"
+              "lh99_f1": "<<LINK_GOES_HERE>>"
             }
 
       - name: Workflow Completed
