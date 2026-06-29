@@ -1,0 +1,62 @@
+name: 'LynxTrac Deploy'
+description: 'Register a LynxTrac release from a CI pipeline via a deployment blueprint.'
+author: 'LynxTrac'
+branding:
+  icon: 'upload-cloud'
+  color: 'green'
+
+inputs:
+  apikey:
+    description: 'LynxTrac API key. Sent as "Authorization: Api-Key <key>". Store it as an encrypted secret.'
+    required: true
+  lynxserver:
+    description: >-
+      Target LynxTrac server. Empty -> app.lynxtrac.com (production). Known aliases: app, beta, qa
+      (resolve to <alias>.lynxtrac.com). Or pass a full http(s) URL for local/dev testing.
+    required: false
+    default: ''
+  blueprint:
+    description: 'Deployment blueprint code (configured in LynxTrac) that holds the release structure.'
+    required: false
+  version:
+    description: 'Semver version for the release (e.g. 2.5.0).'
+    required: false
+  artifacts:
+    description: 'JSON object mapping blueprint slot keys to artifact links, e.g. {"app-bundle":"https://.../app.zip"}.'
+    required: false
+  release-name:
+    description: 'Optional human-readable release name (defaults to the version).'
+    required: false
+  description:
+    description: 'Optional release description.'
+    required: false
+  deploy-modal:
+    description: >-
+      Alias for the named inputs as one JSON object:
+      { "blueprint": "...", "version": "...", "artifacts": { ... }, "release": { "name": "...", "description": "..." } }.
+      If both a named input and the same deploy-modal field are provided, the named input wins.
+    required: false
+  commit:
+    description: 'Commit SHA for provenance (defaults to the triggering commit).'
+    required: false
+    default: ${{ github.sha }}
+  branch:
+    description: 'Branch / ref name for provenance (defaults to the triggering ref).'
+    required: false
+    default: ${{ github.ref_name }}
+
+outputs:
+  release-id:
+    description: 'ID of the created (or already-existing) release.'
+  status:
+    description: 'CREATED | ALREADY_EXISTS | VALIDATION_FAILED.'
+  release-status:
+    description: 'Lifecycle status of the release (v1: REQUESTED — needs human approval).'
+  created:
+    description: 'JSON object { tasks, files } with the counts created.'
+  slots:
+    description: 'JSON map of resolved slot_key -> artifact link.'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

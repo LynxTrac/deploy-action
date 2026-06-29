@@ -1,0 +1,17 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "lynxtrac",
+    "lynxserver",
+    "apikey",
+    "Trac",
+    "ncc",
+    "semver",
+    "bcrypt",
+    "undici",
+    "deadbeefcafe",
+    "uppercased"
+  ],
+  "ignorePaths": ["node_modules/**", "dist/**", "LICENSE"]
+}

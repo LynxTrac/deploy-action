@@ -1,0 +1,40 @@
+# Example: register a LynxTrac release at the end of a build pipeline.
+# Copy the `Register LynxTrac release` step into your own workflow and adjust the slot keys to
+# match your blueprint (open the blueprint in LynxTrac -> Preview -> Copy YAML).
+
+name: build-and-register
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ... your build steps that produce and upload artifacts to a reachable URL ...
+      # e.g. upload app-${{ github.run_number }}.zip to S3 / a release / artifact store.
+
+      - name: Register LynxTrac release
+        id: lynxtrac
+        uses: LynxTrac/deploy-action@v1
+        with:
+          apikey: ${{ secrets.LYNXTRAC_API_KEY }}
+          # lynxserver: ''            # default -> app.lynxtrac.com (production)
+          blueprint: 'web-prod'
+          version: '2.5.0'
+          artifacts: |
+            {
+              "app-bundle": "https://your-ci/artifacts/app-2.5.0.zip",
+              "db-migrate": "https://your-ci/artifacts/migrate-2.5.0.sql"
+            }
+          release-name: 'Web 2.5.0'
+          description: 'Built from ${{ github.sha }}'
+
+      - name: Show result
+        run: |
+          echo "status:     ${{ steps.lynxtrac.outputs.status }}"
+          echo "release-id: ${{ steps.lynxtrac.outputs.release-id }}"
+          echo "created:    ${{ steps.lynxtrac.outputs.created }}"
