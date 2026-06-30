@@ -1,0 +1,26 @@
+name: Test Deployment Action
+# This workflow is designed to test the deployment action in a controlled environment.
+on:
+  workflow_dispatch:
+
+jobs:
+  test-deployment-action:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Register LynxTrac release
+        uses: LynxTrac/deploy-action@development
+        with:
+          apikey: '1q2w3e4r5t'  # Replace with your actual API key
+          blueprint: 'Bp1'
+          version: '1.0.0'
+          artifacts: |
+            {
+              "lh99_f1": "<<LINK_GOES_HERE>>"
+            }
+
+      - name: Workflow Completed
+        run: echo "✅ Deployment Action finished successfully."
