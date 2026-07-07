@@ -28,7 +28,7 @@ export GITHUB_REF_NAME="main"
 
 # GitHub Actions passes `with:` inputs as INPUT_<UPPERCASED NAME>.
 export INPUT_APIKEY="test-api-key-1234"
-export INPUT_LYNXSERVER="http://127.0.0.1:$PORT"
+export INPUT_TRIGGER_ENVIRONMENT="http://127.0.0.1:$PORT"
 export INPUT_BLUEPRINT="web-prod"
 export INPUT_VERSION="2.5.0"
 export INPUT_ARTIFACTS='{"app-bundle":"https://ci.example.com/app-2.5.0.zip"}'

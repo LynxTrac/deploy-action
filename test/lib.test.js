@@ -10,6 +10,7 @@ const {
   normalizeRef,
   mergeInputs,
   buildRequest,
+  formatDeploySummary,
 } = require('../src/lib');
 
 test('resolveServerUrl: empty -> production', () => {
@@ -29,7 +30,7 @@ test('resolveServerUrl: full URL escape hatch (trailing slash trimmed)', () => {
 });
 
 test('resolveServerUrl: unknown alias is rejected (allowlist)', () => {
-  assert.throws(() => resolveServerUrl('staging-typo'), /Invalid lynxserver/);
+  assert.throws(() => resolveServerUrl('staging-typo'), /Invalid trigger_environment/);
 });
 
 test('isValidApiKey / isValidVersion', () => {
@@ -66,7 +67,7 @@ test('mergeInputs: named wins, modal fills gaps', () => {
 test('buildRequest: valid named inputs', () => {
   const { url, headers, body } = buildRequest({
     apikey: 'apikey-123',
-    lynxserver: 'beta',
+    triggerEnvironment: 'beta',
     blueprint: 'web-prod',
     version: '2.5.0',
     artifactsRaw: '{"app-bundle":"https://ci/app.zip"}',
@@ -86,7 +87,7 @@ test('buildRequest: valid named inputs', () => {
 test('buildRequest: deploy-modal alias', () => {
   const { url, body } = buildRequest({
     apikey: 'apikey-123',
-    lynxserver: '',
+    triggerEnvironment: '',
     deployModalRaw: JSON.stringify({
       blueprint: 'web-prod',
       version: '3.0.0',
@@ -142,8 +143,8 @@ test('resolveServerUrl: local/dev aliases point at localhost', () => {
 });
 
 test('resolveServerUrl: rejects a non-http(s) URL / unknown alias', () => {
-  assert.throws(() => resolveServerUrl('ftp://files.example.com'), /Invalid lynxserver/);
-  assert.throws(() => resolveServerUrl('staging-typo'), /Invalid lynxserver/);
+  assert.throws(() => resolveServerUrl('ftp://files.example.com'), /Invalid trigger_environment/);
+  assert.throws(() => resolveServerUrl('staging-typo'), /Invalid trigger_environment/);
 });
 
 test('buildRequest: rejects array artifacts (top-level must be an object map)', () => {
@@ -156,7 +157,7 @@ test('buildRequest: rejects array artifacts (top-level must be an object map)', 
 test('buildRequest: warns when sending the key off the lynxtrac.com domain', () => {
   const { warnings } = buildRequest({
     apikey: 'apikey-123',
-    lynxserver: 'https://evil.example.com',
+    triggerEnvironment: 'https://evil.example.com',
     blueprint: 'bp',
     version: '1.0.0',
     artifactsRaw: '{}',
@@ -167,10 +168,64 @@ test('buildRequest: warns when sending the key off the lynxtrac.com domain', () 
 test('buildRequest: no off-domain warning for localhost (dev)', () => {
   const { warnings } = buildRequest({
     apikey: 'apikey-123',
-    lynxserver: 'local',
+    triggerEnvironment: 'local',
     blueprint: 'bp',
     version: '1.0.0',
     artifactsRaw: '{}',
   });
   assert.ok(!warnings.some((w) => /not a lynxtrac\.com domain/.test(w)));
+});
+
+test('formatDeploySummary: renders a detailed multi-line report', () => {
+  const data = {
+    status: 'CREATED',
+    release_id: 190,
+    release_status: 'APPROVED',
+    version: '0.7.0',
+    created: { tasks: 2, files: 3 },
+    rollout: { triggered: true },
+    report: {
+      blueprint: { code: 'LRB12', name: 'Web Production', product: 'Web' },
+      version: '0.7.0',
+      commit: 'a4c91e2',
+      branch: 'main',
+      counts: { tasks: 2, files: 3 },
+      tasks: [
+        {
+          order: 1,
+          code: 'app-deploy',
+          type: 'BUNDLE',
+          files: [{ name: 'app-0.7.0.zip', type: 'BUNDLE', action: 'NEW', origin: 'DIRECT_LINK', link: 'https://ci/app.zip', extra: false }],
+        },
+        {
+          order: 2,
+          code: 'db-migrate',
+          type: 'FILE',
+          files: [{ name: 'config.json', action: 'NEW', origin: 'DIRECT_LINK', link: 'https://ci/config.json', extra: true }],
+        },
+      ],
+      resolved: { 'app-deploy_app': 'https://ci/app.zip' },
+      omitted: [],
+      extra: ['db-migrate_config'],
+    },
+  };
+  const out = formatDeploySummary(data, { url: 'https://beta.lynxtrac.com', environment: 'beta' });
+  assert.match(out, /LynxTrac Deploy — beta/);
+  assert.match(out, /Web Production \(LRB12\)/);
+  assert.match(out, /Release #190/);
+  assert.match(out, /app-0\.7\.0\.zip/);
+  assert.match(out, /\[extra\]/); // the extra file is tagged
+  assert.match(out, /Extra: db-migrate_config/);
+  assert.match(out, /Rollout: triggered/);
+  assert.match(out, /CREATED: release 190/);
+});
+
+test('formatDeploySummary: degrades gracefully without a report (idempotent re-run)', () => {
+  const out = formatDeploySummary(
+    { status: 'ALREADY_EXISTS', release_id: 5, release_status: 'APPROVED', version: '1.0.0' },
+    { url: 'https://app.lynxtrac.com', environment: '' },
+  );
+  assert.match(out, /LynxTrac Deploy — production/);
+  assert.match(out, /idempotent/);
+  assert.match(out, /release 5/);
 });

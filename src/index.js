@@ -1,7 +1,7 @@
 'use strict';
 
 const core = require('@actions/core');
-const { buildRequest } = require('./lib');
+const { buildRequest, formatDeploySummary } = require('./lib');
 
 /**
  * LT-8787 — LynxTrac deploy action entry point.
@@ -16,7 +16,7 @@ async function run({ coreApi = core, fetchApi = fetch } = {}) {
   try {
     const inputs = {
       apikey: coreApi.getInput('apikey', { required: true }),
-      lynxserver: coreApi.getInput('lynxserver'),
+      triggerEnvironment: coreApi.getInput('trigger_environment'),
       blueprint: coreApi.getInput('blueprint'),
       version: coreApi.getInput('version'),
       artifactsRaw: coreApi.getInput('artifacts'),
@@ -70,10 +70,9 @@ async function run({ coreApi = core, fetchApi = fetch } = {}) {
       return;
     }
 
-    coreApi.info(
-      `LynxTrac deploy ${data.status || 'OK'}: release ${data.release_id ?? '?'} ` +
-        `(status=${data.release_status || '-'}, created=${JSON.stringify(data.created || {})}).`,
-    );
+    // Detailed, multi-line success summary (Task 7): blueprint/version banner, per-task/file
+    // breakdown, resolved/omitted/extra slots, and rollout status.
+    coreApi.info(formatDeploySummary(data, { url, environment: inputs.triggerEnvironment }));
   } catch (err) {
     coreApi.setFailed(err.message);
   }

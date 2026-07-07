@@ -7,7 +7,7 @@
  * The action's I/O (reading inputs, the HTTP call, setting outputs) lives in index.js.
  */
 
-// lynxserver resolution: allowlisted short aliases + a full-URL escape hatch (LT-8787 decision).
+// trigger_environment resolution: allowlisted short aliases + a full-URL escape hatch (LT-8787).
 // Extend ALIASES as QA spins up named test servers under *.lynxtrac.com.
 const SERVER_ALIASES = {
   '': 'https://app.lynxtrac.com', // production default when unspecified
@@ -20,9 +20,9 @@ const SERVER_ALIASES = {
 
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
-/** Resolve the `lynxserver` input to a base URL. Allowlist alias OR full http(s) URL. */
-function resolveServerUrl(lynxserver) {
-  const value = (lynxserver || '').trim();
+/** Resolve the `trigger_environment` input to a base URL. Allowlist alias OR full http(s) URL. */
+function resolveServerUrl(triggerEnvironment) {
+  const value = (triggerEnvironment || '').trim();
   if (!value) {
     return SERVER_ALIASES[''];
   }
@@ -32,10 +32,10 @@ function resolveServerUrl(lynxserver) {
     try {
       url = new URL(value);
     } catch {
-      throw new Error(`Invalid lynxserver URL: ${value}`);
+      throw new Error(`Invalid trigger_environment URL: ${value}`);
     }
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      throw new Error(`lynxserver URL must use http(s): ${value}`);
+      throw new Error(`trigger_environment URL must use http(s): ${value}`);
     }
     return value.replace(/\/+$/, '');
   }
@@ -46,7 +46,7 @@ function resolveServerUrl(lynxserver) {
   }
 
   const allowed = Object.keys(SERVER_ALIASES).filter(Boolean).join(', ');
-  throw new Error(`Invalid lynxserver '${value}'. Use one of: ${allowed}, or a full http(s) URL.`);
+  throw new Error(`Invalid trigger_environment '${value}'. Use one of: ${allowed}, or a full http(s) URL.`);
 }
 
 function isValidApiKey(apiKey) {
@@ -98,7 +98,7 @@ function mergeInputs(named, modal) {
  * @returns {{ url: string, headers: object, body: object, warnings: string[] }}
  */
 function buildRequest(inputs) {
-  const { apikey, lynxserver, commit, branch } = inputs;
+  const { apikey, triggerEnvironment, commit, branch } = inputs;
   const warnings = [];
 
   if (!isValidApiKey(apikey)) {
@@ -147,16 +147,16 @@ function buildRequest(inputs) {
     throw new Error('artifacts must be a JSON object mapping slot_key -> link.');
   }
 
-  const baseUrl = resolveServerUrl(lynxserver);
+  const baseUrl = resolveServerUrl(triggerEnvironment);
   const url = `${baseUrl}/api/external/deploy/release`;
 
   // Warn if the API key is about to be sent somewhere other than *.lynxtrac.com (or localhost) —
-  // a typo'd/tampered full-URL lynxserver would otherwise leak the key silently.
+  // a typo'd/tampered full-URL trigger_environment would otherwise leak the key silently.
   try {
     const host = new URL(baseUrl).hostname;
     const trusted = host === 'lynxtrac.com' || host.endsWith('.lynxtrac.com') || host === 'localhost' || host === '127.0.0.1';
     if (!trusted) {
-      warnings.push(`lynxserver host '${host}' is not a lynxtrac.com domain — sending the API key there.`);
+      warnings.push(`trigger_environment host '${host}' is not a lynxtrac.com domain — sending the API key there.`);
     }
   } catch {
     // baseUrl is always a valid URL by construction; ignore.
@@ -184,6 +184,85 @@ function buildRequest(inputs) {
   };
 }
 
+/**
+ * Build a detailed, human-readable multi-line summary of a successful deploy (Task 7).
+ * Uses the backend `report` (per-task/file breakdown + resolved/omitted/extra) when present,
+ * and degrades gracefully to a concise summary when it is not (e.g. idempotent re-runs).
+ *
+ * @param {object} data  Parsed backend response body.
+ * @param {{ url?: string, environment?: string }} ctx
+ * @returns {string}
+ */
+function formatDeploySummary(data = {}, ctx = {}) {
+  const { url = '', environment = '' } = ctx;
+  const report = data.report || null;
+  const lines = [];
+
+  lines.push(`LynxTrac Deploy — ${environment || 'production'}${url ? `  (${url})` : ''}`);
+
+  if (report && report.blueprint) {
+    const bp = report.blueprint;
+    lines.push(
+      `Blueprint : ${bp.name || '-'} (${bp.code || '-'})` + (bp.product ? `     Product: ${bp.product}` : ''),
+    );
+  }
+
+  const version = (report && report.version) || data.version || '-';
+  const prov = [];
+  if (report && report.commit) prov.push(`Commit: ${report.commit}`);
+  if (report && report.branch) prov.push(`Branch: ${report.branch}`);
+  lines.push(`Version   : ${version}${prov.length ? `   ${prov.join('   ')}` : ''}`);
+
+  const idem = data.status === 'ALREADY_EXISTS' ? 'idempotent — no change' : data.healed ? 'healed' : 'new';
+  lines.push('');
+  lines.push(
+    `> Release #${data.release_id != null ? data.release_id : '?'}   ` +
+      `status=${data.release_status || '-'}   source=CI_PIPELINE   (${idem})`,
+  );
+
+  if (report && Array.isArray(report.tasks) && report.tasks.length) {
+    const counts = report.counts || data.created || {};
+    lines.push('');
+    lines.push(`Tasks (${counts.tasks != null ? counts.tasks : report.tasks.length}) · Files (${counts.files != null ? counts.files : '?'})`);
+    report.tasks.forEach((task) => {
+      lines.push(`  ${task.order}. ${task.code || task.name || '-'}   ${task.type || ''}`.replace(/\s+$/, ''));
+      (task.files || []).forEach((f) => {
+        const meta = [];
+        if (f.checksum_algorithm) meta.push(f.checksum_algorithm);
+        if (f.expiry_hours) meta.push(`${f.expiry_hours}h`);
+        const metaStr = meta.length ? `   (${meta.join(', ')})` : '';
+        const dest = f.link ? ` -> ${f.link}` : '';
+        const tag = f.extra ? ' [extra]' : '';
+        lines.push(`       - ${f.name}${tag}   ${f.action || ''} ${f.origin || ''}${dest}${metaStr}`.replace(/\s+$/, ''));
+      });
+    });
+
+    const resolved = Object.keys(report.resolved || {});
+    lines.push('');
+    lines.push(`Slots resolved: ${resolved.length ? resolved.join(', ') : 'none'}`);
+    lines.push(
+      `Omitted: ${report.omitted && report.omitted.length ? report.omitted.join(', ') : 'none'}` +
+        `    Extra: ${report.extra && report.extra.length ? report.extra.join(', ') : 'none'}`,
+    );
+  }
+
+  if (data.rollout) {
+    lines.push(
+      `Rollout: ${data.rollout.triggered ? 'triggered (on-demand)' : `not triggered (${data.rollout.error || 'n/a'})`}`,
+    );
+  }
+
+  const counts = data.created || (report && report.counts) || {};
+  lines.push('');
+  lines.push(
+    `${data.status || 'OK'}: release ${data.release_id != null ? data.release_id : '?'} ` +
+      `(${data.release_status || '-'}) — ${counts.tasks != null ? counts.tasks : '?'} tasks, ` +
+      `${counts.files != null ? counts.files : '?'} files.`,
+  );
+
+  return lines.join('\n');
+}
+
 module.exports = {
   SERVER_ALIASES,
   resolveServerUrl,
@@ -193,4 +272,5 @@ module.exports = {
   normalizeRef,
   mergeInputs,
   buildRequest,
+  formatDeploySummary,
 };

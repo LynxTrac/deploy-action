@@ -9,9 +9,9 @@ inputs:
   apikey:
     description: 'LynxTrac API key. Sent as "Authorization: Api-Key <key>". Store it as an encrypted secret.'
     required: true
-  lynxserver:
+  trigger_environment:
     description: >-
-      Target LynxTrac server. Empty -> app.lynxtrac.com (production). Known aliases: app, beta, qa
+      Target LynxTrac environment. Empty -> app.lynxtrac.com (production). Known aliases: app, beta, qa
       (resolve to <alias>.lynxtrac.com). Or pass a full http(s) URL for local/dev testing.
     required: false
     default: ''
@@ -51,7 +51,7 @@ outputs:
   status:
     description: 'CREATED | ALREADY_EXISTS | VALIDATION_FAILED.'
   release-status:
-    description: 'Lifecycle status of the release (v1: REQUESTED — needs human approval).'
+    description: 'Lifecycle status of the created release (e.g. APPROVED).'
   created:
     description: 'JSON object { tasks, files } with the counts created.'
   slots:

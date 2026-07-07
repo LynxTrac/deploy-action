@@ -19,7 +19,7 @@ jobs:
         uses: ./
         with:
           apikey: ${{ secrets.LYNXTRAC_TEST_API_KEY }}
-          lynxserver: 'qa'
+          trigger_environment: 'qa'
           blueprint: 'web-prod'
           version: '0.0.0-e2e.${{ github.run_number }}'
           artifacts: |
