@@ -17,8 +17,8 @@ calls LynxTrac to create the release (version + tasks + files) for you.
   uses: LynxTrac/deploy-action@v1
   with:
     apikey: ${{ secrets.LYNXTRAC_API_KEY }}
-    lynxserver: ''                 # '' -> app.lynxtrac.com (production)
-    blueprint: 'web-prod'          # blueprint code configured in LynxTrac
+    trigger_environment: ''        # '' -> app.lynxtrac.com (production)
+    blueprint: 'LRB12'             # blueprint code (auto-generated in LynxTrac, e.g. LRB12)
     version: '2.5.0'
     artifacts: |                   # { slot_key -> artifact link }
       {
@@ -35,8 +35,8 @@ blueprint in LynxTrac and use **Preview → Copy YAML** to generate this block w
 | Input | Required | Description |
 |---|---|---|
 | `apikey` | ✅ | LynxTrac API key. Sent as `Authorization: Api-Key <key>`. **Store it as a secret.** |
-| `lynxserver` | | Target server. Empty → `app.lynxtrac.com`. Aliases: `app`/`beta`/`qa` → `<alias>.lynxtrac.com`, `local`/`dev` → `http://localhost:5566`. Or a full `http(s)` URL. |
-| `blueprint` | | Release blueprint code (holds the release structure). Required unless supplied via `deploy-modal`. |
+| `trigger_environment` | | Target LynxTrac environment. Empty → `app.lynxtrac.com`. Aliases: `app`/`beta`/`qa` → `<alias>.lynxtrac.com`, `local`/`dev` → `http://localhost:5566`. Or a full `http(s)` URL. |
+| `blueprint` | | Release blueprint code (auto-generated in LynxTrac, e.g. `LRB12`; holds the release structure). Required unless supplied via `deploy-modal`. |
 | `version` | | Semver version for the release (e.g. `2.5.0`). |
 | `artifacts` | | JSON object mapping blueprint slot keys to a value. Each value is either a link string, or an object `{ "link": "...", "checksum": "...", "checksumType": "sha256" }` to also record an integrity hash. SFTP/FTP slots take the remote path instead of a URL. |
 | `release-name` | | Human-readable release name (defaults to the version). |
@@ -55,6 +55,14 @@ blueprint in LynxTrac and use **Preview → Copy YAML** to generate this block w
 | `created` | JSON `{ tasks, files }` counts created. |
 | `slots` | JSON map of resolved `slot_key -> link`. |
 
+## Workflow log
+
+On success the step prints a detailed, human-readable summary — the target environment and
+blueprint, the release id and status, a per-task/per-file breakdown (action, origin, destination
+link, checksum), and which slots were **resolved / omitted / added as extras** — so you can see
+exactly what the release contains without opening LynxTrac. Failures print the backend error
+`code` and message on a single line and fail the step.
+
 ## `deploy-modal` alias
 
 If you prefer a single JSON blob, use `deploy-modal` instead of the named inputs:
@@ -63,7 +71,7 @@ If you prefer a single JSON blob, use `deploy-modal` instead of the named inputs
 - uses: LynxTrac/deploy-action@v1
   with:
     apikey: ${{ secrets.LYNXTRAC_API_KEY }}
-    lynxserver: 'beta'
+    trigger_environment: 'beta'
     deploy-modal: |
       {
         "blueprint": "web-prod",
@@ -78,7 +86,7 @@ If you prefer a single JSON blob, use `deploy-modal` instead of the named inputs
 Re-running the same build is safe. A release is unique per `(vendor, product, version)`; a repeat
 call returns `status: ALREADY_EXISTS` with the existing `release-id` and creates nothing new.
 
-## Selecting a server (`lynxserver`)
+## Selecting an environment (`trigger_environment`)
 
 - empty / `app` → `https://app.lynxtrac.com` (production)
 - `beta` → `https://beta.lynxtrac.com`

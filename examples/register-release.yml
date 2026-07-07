@@ -22,7 +22,7 @@ jobs:
         uses: LynxTrac/deploy-action@v1
         with:
           apikey: ${{ secrets.LYNXTRAC_API_KEY }}
-          # lynxserver: ''            # default -> app.lynxtrac.com (production)
+          # trigger_environment: ''   # default -> app.lynxtrac.com (production)
           blueprint: 'web-prod'
           version: '2.5.0'
           artifacts: |

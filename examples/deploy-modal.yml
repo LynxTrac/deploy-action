@@ -13,7 +13,7 @@ jobs:
         uses: LynxTrac/deploy-action@v1
         with:
           apikey: ${{ secrets.LYNXTRAC_API_KEY }}
-          lynxserver: 'beta'
+          trigger_environment: 'beta'
           deploy-modal: |
             {
               "blueprint": "web-prod",
