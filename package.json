@@ -8,6 +8,9 @@
   },
   "private": true,
   "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "ncc build src/github.js -o dist --minify --license licenses.txt",
     "test": "node --test \"test/**/*.test.js\""
