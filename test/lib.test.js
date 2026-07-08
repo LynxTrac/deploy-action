@@ -79,16 +79,16 @@ test('buildRequest: valid named inputs', () => {
   assert.strictEqual(headers.Authorization, 'Api-Key apikey-123');
   assert.strictEqual(body.blueprint, 'web-prod');
   assert.deepStrictEqual(body.artifacts, { 'app-bundle': 'https://ci/app.zip' });
-  assert.strictEqual(body['release-name'], 'Web 2.5.0');
+  assert.strictEqual(body.release_name, 'Web 2.5.0');
   assert.strictEqual(body.branch, 'main');
   assert.strictEqual(body.commit, 'abc123');
 });
 
-test('buildRequest: deploy-modal alias', () => {
+test('buildRequest: deploy_manifest alias', () => {
   const { url, body } = buildRequest({
     apikey: 'apikey-123',
     triggerEnvironment: '',
-    deployModalRaw: JSON.stringify({
+    deployManifestRaw: JSON.stringify({
       blueprint: 'web-prod',
       version: '3.0.0',
       artifacts: { 'app-bundle': 'https://ci/app.zip' },
@@ -98,8 +98,38 @@ test('buildRequest: deploy-modal alias', () => {
   assert.strictEqual(url, 'https://app.lynxtrac.com/api/external/deploy/release');
   assert.strictEqual(body.blueprint, 'web-prod');
   assert.strictEqual(body.version, '3.0.0');
-  assert.strictEqual(body['release-name'], 'R3');
+  assert.strictEqual(body.release_name, 'R3');
   assert.strictEqual(body.description, 'desc');
+});
+
+test('buildRequest: EVERYTHING passed as one deploy_manifest JSON (no named inputs)', () => {
+  // Requester-confirmed scenario: the whole deploy request supplied as a single JSON object,
+  // with no separate blueprint/version/artifacts inputs. Must build a complete, valid request.
+  const { url, headers, body } = buildRequest({
+    apikey: 'apikey-123',
+    triggerEnvironment: 'qa',
+    deployManifestRaw: JSON.stringify({
+      blueprint: 'web-prod',
+      version: '4.2.1',
+      artifacts: {
+        'app-bundle': 'https://ci/app-4.2.1.zip',
+        config: { link: 'https://ci/config.json', checksum: 'deadbeef', checksumType: 'sha256' },
+      },
+      release: { name: 'Web 4.2.1', description: 'Full manifest build' },
+    }),
+  });
+  assert.strictEqual(url, 'https://qa.lynxtrac.com/api/external/deploy/release');
+  assert.strictEqual(headers.Authorization, 'Api-Key apikey-123');
+  assert.strictEqual(body.blueprint, 'web-prod');
+  assert.strictEqual(body.version, '4.2.1');
+  assert.strictEqual(body.artifacts['app-bundle'], 'https://ci/app-4.2.1.zip');
+  assert.deepStrictEqual(body.artifacts.config, {
+    link: 'https://ci/config.json',
+    checksum: 'deadbeef',
+    checksumType: 'sha256',
+  });
+  assert.strictEqual(body.release_name, 'Web 4.2.1');
+  assert.strictEqual(body.description, 'Full manifest build');
 });
 
 test('buildRequest: artifact value may be an object (checksum) and is passed through', () => {
@@ -116,16 +146,23 @@ test('buildRequest: artifact value may be an object (checksum) and is passed thr
   assert.strictEqual(body.artifacts.cfg, 'https://ci/cfg.json');
 });
 
-test('buildRequest: named input overrides deploy-modal and warns', () => {
+test('buildRequest: named input overrides deploy_manifest and warns', () => {
   const { body, warnings } = buildRequest({
     apikey: 'apikey-123',
     blueprint: 'named-bp',
     version: '1.0.0',
-    deployModalRaw: JSON.stringify({ blueprint: 'modal-bp', version: '2.0.0', artifacts: {} }),
+    deployManifestRaw: JSON.stringify({ blueprint: 'manifest-bp', version: '2.0.0', artifacts: {} }),
   });
   assert.strictEqual(body.blueprint, 'named-bp');
   assert.strictEqual(body.version, '1.0.0');
   assert.ok(warnings.length >= 1);
+});
+
+test('buildRequest: deploy_manifest must be a JSON object (array rejected)', () => {
+  assert.throws(
+    () => buildRequest({ apikey: 'apikey-123', deployManifestRaw: '[1,2,3]' }),
+    /deploy_manifest must be a JSON object/,
+  );
 });
 
 test('buildRequest: rejects bad apikey / version / missing blueprint', () => {

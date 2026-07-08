@@ -30,7 +30,7 @@ jobs:
               "app-bundle": "https://your-ci/artifacts/app-2.5.0.zip",
               "db-migrate": "https://your-ci/artifacts/migrate-2.5.0.sql"
             }
-          release-name: 'Web 2.5.0'
+          release_name: 'Web 2.5.0'
           description: 'Built from ${{ github.sha }}'
 
       - name: Show result

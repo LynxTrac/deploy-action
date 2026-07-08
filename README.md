@@ -36,12 +36,12 @@ blueprint in LynxTrac and use **Preview → Copy YAML** to generate this block w
 |---|---|---|
 | `apikey` | ✅ | LynxTrac API key. Sent as `Authorization: Api-Key <key>`. **Store it as a secret.** |
 | `trigger_environment` | | Target LynxTrac environment. Empty → `app.lynxtrac.com`. Aliases: `app`/`beta`/`qa` → `<alias>.lynxtrac.com`, `local`/`dev` → `http://localhost:5566`. Or a full `http(s)` URL. |
-| `blueprint` | | Release blueprint code (auto-generated in LynxTrac, e.g. `LRB12`; holds the release structure). Required unless supplied via `deploy-modal`. |
+| `blueprint` | | Release blueprint code (auto-generated in LynxTrac, e.g. `LRB12`; holds the release structure). Required unless supplied via `deploy_manifest`. |
 | `version` | | Semver version for the release (e.g. `2.5.0`). |
 | `artifacts` | | JSON object mapping blueprint slot keys to a value. Each value is either a link string, or an object `{ "link": "...", "checksum": "...", "checksumType": "sha256" }` to also record an integrity hash. SFTP/FTP slots take the remote path instead of a URL. |
-| `release-name` | | Human-readable release name (defaults to the version). |
+| `release_name` | | Human-readable release name (defaults to the version). |
 | `description` | | Release description. |
-| `deploy-modal` | | Alias: one JSON object `{ blueprint, version, artifacts, release: { name, description } }`. Named inputs win if both are set. |
+| `deploy_manifest` | | Alias: one JSON object `{ blueprint, version, artifacts, release: { name, description } }`. Named inputs win if both are set. |
 | `commit` | | Commit SHA for provenance (defaults to the triggering commit). |
 | `branch` | | Branch/ref for provenance (defaults to the triggering ref). |
 
@@ -63,16 +63,44 @@ link, checksum), and which slots were **resolved / omitted / added as extras** �
 exactly what the release contains without opening LynxTrac. Failures print the backend error
 `code` and message on a single line and fail the step.
 
-## `deploy-modal` alias
+## Bitbucket Pipelines
 
-If you prefer a single JSON blob, use `deploy-modal` instead of the named inputs:
+The same action works from **Bitbucket Pipelines**. There it is installed from git and run as
+`npx lynxtrac-deploy`; since Bitbucket has no `with:` inputs, inputs are supplied as environment
+variables (uppercase, snake_case — the same argument names as the GitHub inputs):
+
+```yaml
+image: node:20
+pipelines:
+  default:
+    - step:
+        name: Register LynxTrac release
+        script:
+          - npm install git+https://github.com/LynxTrac/deploy-action.git
+          # APIKEY (and optional TRIGGER_ENVIRONMENT) come from Repository variables.
+          # commit/branch auto-fill from Bitbucket's BITBUCKET_COMMIT / BITBUCKET_BRANCH.
+          - >
+            BLUEPRINT='LRB12'
+            VERSION='2.5.0'
+            ARTIFACTS='{ "app-bundle": "https://your-ci/app-2.5.0.zip" }'
+            npx lynxtrac-deploy
+```
+
+Env vars: `APIKEY`, `TRIGGER_ENVIRONMENT`, `BLUEPRINT`, `VERSION`, `ARTIFACTS`, `RELEASE_NAME`,
+`DESCRIPTION`, `DEPLOY_MANIFEST` (plus `COMMIT` / `BRANCH`, which default from `BITBUCKET_COMMIT` /
+`BITBUCKET_BRANCH`). The behavior, validation, and detailed summary are identical to GitHub — both
+providers share one processing unit. See [`examples/bitbucket-pipelines.yml`](examples/bitbucket-pipelines.yml).
+
+## `deploy_manifest` alias
+
+If you prefer a single JSON blob, use `deploy_manifest` instead of the named inputs:
 
 ```yaml
 - uses: LynxTrac/deploy-action@v1
   with:
     apikey: ${{ secrets.LYNXTRAC_API_KEY }}
     trigger_environment: 'beta'
-    deploy-modal: |
+    deploy_manifest: |
       {
         "blueprint": "web-prod",
         "version": "2.5.0",
@@ -80,6 +108,8 @@ If you prefer a single JSON blob, use `deploy-modal` instead of the named inputs
         "release": { "name": "Web 2.5.0", "description": "CI build" }
       }
 ```
+
+(On Bitbucket, pass the same JSON via the `DEPLOY_MANIFEST` environment variable.)
 
 ## Idempotency
 
@@ -113,14 +143,25 @@ More examples live in [`examples/`](examples/). See the server repo's
 
 ## Development
 
-This is a JavaScript (Node 20) action. Source is in `src/`; the committed `dist/` bundle is what
-runs. After editing `src/`:
+This is a JavaScript (Node 20) action with two thin entry points over one shared processing unit:
+
+- `src/lib.js` — pure helpers (URL resolution, request build, summary formatting; no network / no I/O).
+- `src/core.js` — the **common processing unit**: build → POST → map response → report, provider-agnostic.
+- `src/github.js` — **GitHub Actions** entry (reads `INPUT_*` via `@actions/core`). Bundled by ncc into the
+  committed `dist/index.js`, which is what GitHub actually runs (`action.yml` `main`).
+- `src/bitbucket.js` — **Bitbucket Pipelines** entry (`bin: lynxtrac-deploy`; reads env vars). Run straight from
+  the git-installed package — no bundle needed.
+
+After editing `src/`:
 
 ```bash
 npm install
-npm test          # node --test
-npm run build     # rebuilds dist/ with @vercel/ncc — commit the result
+npm test          # node --test  (lib, core, github, bitbucket)
+npm run build     # rebuilds dist/index.js from src/github.js with @vercel/ncc — commit the result
 ```
+
+> Outputs (`release-id`, `status`, …) are a GitHub Actions concept and are only set on the GitHub path;
+> the Bitbucket entry prints the same detailed summary and fails the step (exit 1) on error.
 
 > Maintainers: the `internal/` folder holds an internal dev/E2E harness and is **not** part of the
 > action's public usage surface — external users can ignore it.

@@ -78,11 +78,11 @@ function normalizeRef(ref) {
 }
 
 /**
- * Merge named inputs with the deploy-modal alias object.
- * Named inputs win per field; deploy-modal fills any gaps.
+ * Merge named inputs with the deploy_manifest alias object.
+ * Named inputs win per field; deploy_manifest fills any gaps.
  */
-function mergeInputs(named, modal) {
-  const m = modal || {};
+function mergeInputs(named, manifest) {
+  const m = manifest || {};
   const mRelease = m.release || {};
   return {
     blueprint: named.blueprint || m.blueprint || '',
@@ -113,30 +113,30 @@ function buildRequest(inputs) {
     description: (inputs.description || '').trim(),
   };
 
-  const modal = parseJsonInput(inputs.deployModalRaw, 'deploy-modal');
-  if (modal && (typeof modal !== 'object' || Array.isArray(modal))) {
-    throw new Error('deploy-modal must be a JSON object.');
+  const manifest = parseJsonInput(inputs.deployManifestRaw, 'deploy_manifest');
+  if (manifest && (typeof manifest !== 'object' || Array.isArray(manifest))) {
+    throw new Error('deploy_manifest must be a JSON object.');
   }
 
-  // Warn (don't fail) when a named input overrides a deploy-modal field — no silent ambiguity.
-  if (modal) {
-    for (const [namedKey, modalKey] of [
+  // Warn (don't fail) when a named input overrides a deploy_manifest field — no silent ambiguity.
+  if (manifest) {
+    for (const [namedKey, manifestKey] of [
       ['blueprint', 'blueprint'],
       ['version', 'version'],
     ]) {
-      if (named[namedKey] && modal[modalKey] && named[namedKey] !== modal[modalKey]) {
-        warnings.push(`Both '${namedKey}' input and deploy-modal.${modalKey} set — using the named input.`);
+      if (named[namedKey] && manifest[manifestKey] && named[namedKey] !== manifest[manifestKey]) {
+        warnings.push(`Both '${namedKey}' input and deploy_manifest.${manifestKey} set — using the named input.`);
       }
     }
-    if (named.artifacts !== undefined && modal.artifacts) {
-      warnings.push("Both 'artifacts' input and deploy-modal.artifacts set — using the named input.");
+    if (named.artifacts !== undefined && manifest.artifacts) {
+      warnings.push("Both 'artifacts' input and deploy_manifest.artifacts set — using the named input.");
     }
   }
 
-  const merged = mergeInputs(named, modal);
+  const merged = mergeInputs(named, manifest);
 
   if (!merged.blueprint) {
-    throw new Error('blueprint is required (set the `blueprint` input or deploy-modal.blueprint).');
+    throw new Error('blueprint is required (set the `blueprint` input or deploy_manifest.blueprint).');
   }
   if (!isValidVersion(merged.version)) {
     throw new Error(`version must be valid semver (got '${merged.version}').`);
@@ -164,7 +164,7 @@ function buildRequest(inputs) {
 
   const body = { blueprint: merged.blueprint, version: merged.version, artifacts };
   if (merged.releaseName) {
-    body['release-name'] = merged.releaseName;
+    body.release_name = merged.releaseName;
   }
   if (merged.description) {
     body.description = merged.description;
