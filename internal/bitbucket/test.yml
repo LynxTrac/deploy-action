@@ -6,7 +6,7 @@
 # store APIKEY (and optionally TRIGGER_ENVIRONMENT) as Repository variables; set the per-release
 # values inline before the command. commit/branch auto-fill from BITBUCKET_COMMIT/BITBUCKET_BRANCH.
 
-image: node:20
+image: node:22 # requires Node.js 18+
 
 pipelines:
   default:

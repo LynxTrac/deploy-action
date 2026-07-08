@@ -2,6 +2,7 @@
 'use strict';
 
 const { processTrigger } = require('./core');
+const { assertSupportedNode } = require('./node-version');
 
 /**
  * LT-9216 — Bitbucket Pipelines entry point for the LynxTrac deploy action.
@@ -62,8 +63,12 @@ async function run({
 }
 
 // Only auto-run when invoked directly (so the function can be unit-tested without firing).
+// Gate on the Node version BEFORE calling run(): run()'s `fetchApi = fetch` default is evaluated on
+// invocation and would throw "fetch is not defined" on Node < 18 before any guard inside run() could.
 if (require.main === module) {
-  run();
+  if (assertSupportedNode()) {
+    run();
+  }
 }
 
 module.exports = { run };

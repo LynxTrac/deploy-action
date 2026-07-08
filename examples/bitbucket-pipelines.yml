@@ -8,7 +8,7 @@
 # The set of ARTIFACTS slot keys comes from your blueprint — open it in LynxTrac and use
 # Dry run -> Copy YAML (choose "Bitbucket Pipelines") to generate this block with the exact slots.
 
-image: node:20
+image: node:22 # requires Node.js 18+
 
 pipelines:
   default:

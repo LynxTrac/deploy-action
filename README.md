@@ -70,7 +70,7 @@ The same action works from **Bitbucket Pipelines**. There it is installed from g
 variables (uppercase, snake_case — the same argument names as the GitHub inputs):
 
 ```yaml
-image: node:20
+image: node:22 # requires Node.js 18+
 pipelines:
   default:
     - step:
@@ -85,6 +85,10 @@ pipelines:
             ARTIFACTS='{ "app-bundle": "https://your-ci/app-2.5.0.zip" }'
             npx lynxtrac-deploy
 ```
+
+> **Node.js 18+ required.** The action uses the global `fetch`, which exists on Node 18 and newer.
+> Pin a modern Node image (e.g. `node:22`) — on an older runtime the step fails fast with a clear
+> version error. (GitHub Actions is unaffected: `action.yml` pins its runtime to `node20`.)
 
 Env vars: `APIKEY`, `TRIGGER_ENVIRONMENT`, `BLUEPRINT`, `VERSION`, `ARTIFACTS`, `RELEASE_NAME`,
 `DESCRIPTION`, `DEPLOY_MANIFEST` (plus `COMMIT` / `BRANCH`, which default from `BITBUCKET_COMMIT` /
@@ -143,7 +147,8 @@ More examples live in [`examples/`](examples/). See the server repo's
 
 ## Development
 
-This is a JavaScript (Node 20) action with two thin entry points over one shared processing unit:
+This is a JavaScript action (**requires Node.js 18+** — it uses the global `fetch`) with two thin
+entry points over one shared processing unit:
 
 - `src/lib.js` — pure helpers (URL resolution, request build, summary formatting; no network / no I/O).
 - `src/core.js` — the **common processing unit**: build → POST → map response → report, provider-agnostic.

@@ -2,6 +2,7 @@
 
 const core = require('@actions/core');
 const { processTrigger } = require('./core');
+const { assertSupportedNode } = require('./node-version');
 
 /**
  * LT-8787 / LT-9216 — GitHub Actions entry point for the LynxTrac deploy action.
@@ -43,8 +44,12 @@ async function run({ coreApi = core, fetchApi = fetch } = {}) {
 }
 
 // Only auto-run when invoked directly (so the function can be unit-tested without firing).
+// GitHub pins the runtime to node20 via action.yml, so this always passes there; the gate is kept
+// for parity and defence, and must precede run() (see node-version.js / bitbucket.js for why).
 if (require.main === module) {
-  run();
+  if (assertSupportedNode()) {
+    run();
+  }
 }
 
 module.exports = { run };
