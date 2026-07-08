@@ -14,7 +14,7 @@ jobs:
           apikey: '1q2w3e4r5t'
           blueprint: 'LRB9'
           version: '0.7.0+a4.z91'
-          lynxserver: 'https://haunted-angela-attractingly.ngrok-free.dev'
+          trigger_environment: 'https://haunted-angela-attractingly.ngrok-free.dev'
           artifacts: |
             {
               "lh201_f1": "https://getsamplefiles.com/download/zip/sample-3.zi"
