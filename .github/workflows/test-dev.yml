@@ -1,0 +1,24 @@
+name: Test Deploy Action
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Register LynxTrac release
+        uses: LynxTrac/deploy-action@feature/lt-9216__bitbucket_workflow_listener
+        with:
+          apikey: '1q2w3e4r5t'
+          blueprint: 'LRB9'
+          version: '0.7.0+a4.z91'
+          lynxserver: 'https://haunted-angela-attractingly.ngrok-free.dev'
+          artifacts: |
+            {
+              "lh201_f1": "https://getsamplefiles.com/download/zip/sample-3.zi"
+            }
+    
+      - name: Workflow Completed
+        run: echo "✅ Deployment Action finished successfully."

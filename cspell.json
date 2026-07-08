@@ -10,7 +10,10 @@
     "bcrypt",
     "undici",
     "deadbeefcafe",
-    "uppercased"
+    "uppercased",
+    "bitbucket",
+    "npx",
+    "ngrok"
   ],
   "ignorePaths": ["node_modules/**", "dist/**", "LICENSE"]
 }

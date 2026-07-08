@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { run } = require('../src/index');
+const { run } = require('../src/github');
 
 // Minimal @actions/core stand-in that records what the action did.
 function makeCore(inputs) {
@@ -84,4 +84,24 @@ test('run: a build/validation error fails the step (no network call)', async () 
   });
   assert.strictEqual(fetched, false);
   assert.match(state.failed, /apikey is required/);
+});
+
+test('run: reads snake_case inputs (release_name, deploy_manifest) and sends them', async () => {
+  const { api, state } = makeCore({
+    apikey: 'apikey-1234',
+    blueprint: 'web-prod',
+    version: '2.5.0',
+    artifacts: '{"app":"https://ci/app.zip"}',
+    release_name: 'Web 2.5.0',
+  });
+  let sentBody = null;
+  await run({
+    coreApi: api,
+    fetchApi: async (_url, opts) => {
+      sentBody = JSON.parse(opts.body);
+      return { ok: true, status: 201, text: async () => JSON.stringify({ status: 'CREATED', release_id: 1 }) };
+    },
+  });
+  assert.strictEqual(state.failed, null);
+  assert.strictEqual(sentBody.release_name, 'Web 2.5.0');
 });

@@ -11,9 +11,16 @@ without needing a live LynxTrac server, by standing up a tiny mock backend local
 
 | Path | Purpose |
 |---|---|
+| [`github/test.js`](github/test.js) | Manual runner for the **GitHub** entry: sets `INPUT_*` env vars and calls `src/github.js`. |
+| [`github/test.yml`](github/test.yml) | Sample GitHub *consuming* workflow (the `workflow → action` half). |
+| [`bitbucket/test.js`](bitbucket/test.js) | Manual runner for the **Bitbucket** entry: sets env vars and calls `src/bitbucket.js`. |
+| [`bitbucket/test.yml`](bitbucket/test.yml) | Sample `bitbucket-pipelines.yml` invoking the action via `npx lynxtrac-deploy`. |
 | [`e2e/mock-backend.js`](e2e/mock-backend.js) | Minimal HTTP server mimicking `POST /api/external/deploy/release`. |
-| [`e2e/run-local.sh`](e2e/run-local.sh) | Builds nothing — runs the bundled `dist/index.js` against the mock and asserts the outputs. |
-| [`e2e/workflow.sample.yml`](e2e/workflow.sample.yml) | A sample *consuming* workflow showing the action used as a CI step (the `workflow → action` half). |
+| [`e2e/run-local.sh`](e2e/run-local.sh) | Builds nothing — runs the bundled `dist/index.js` (GitHub entry) against the mock and asserts the outputs. |
+| [`e2e/workflow.sample.yml`](e2e/workflow.sample.yml) | A sample *consuming* workflow showing the action used as a CI step. |
+
+The `github/` and `bitbucket/` subfolders hold the per-provider manual runners; both drive the same
+shared processing unit (`src/core.js`), so a green run on one is representative of the other.
 
 ## Run the E2E harness locally
 

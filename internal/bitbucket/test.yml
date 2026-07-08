@@ -1,0 +1,27 @@
+# Test Deployment Action — Bitbucket Pipelines sample (Task 3).
+# Mirrors internal/github/test.yml for the Bitbucket entry point. Drop this in as
+# `bitbucket-pipelines.yml` in a test repo to exercise the action end-to-end.
+#
+# The action is installed from git and run as `npx lynxtrac-deploy`. Inputs are env vars:
+# store APIKEY (and optionally TRIGGER_ENVIRONMENT) as Repository variables; set the per-release
+# values inline before the command. commit/branch auto-fill from BITBUCKET_COMMIT/BITBUCKET_BRANCH.
+
+image: node:22 # requires Node.js 18+
+
+pipelines:
+  default:
+    - step:
+        name: Register LynxTrac release
+        script:
+          - npm install git+https://github.com/LynxTrac/deploy-action.git
+          - >
+            APIKEY='1q2w3e4r5t'
+            BLUEPRINT='Bp1'
+            VERSION='1.0.0'
+            ARTIFACTS='{ "lh99_f1": "<<LINK_GOES_HERE>>" }'
+            npx lynxtrac-deploy
+        # (APIKEY is inline here only for the sample — in a real pipeline use a Repository variable.)
+    - step:
+        name: Workflow Completed
+        script:
+          - echo "Deployment Action finished successfully."
