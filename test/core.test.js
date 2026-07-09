@@ -37,18 +37,41 @@ test('processTrigger: masks the key, maps outputs, returns ok on success', async
     async () => ({
       ok: true,
       status: 201,
-      text: async () => JSON.stringify({ status: 'CREATED', release_id: 12, release_status: 'APPROVED', created: { tasks: 2, files: 3 }, slots: { app: 'https://ci/app.zip' } }),
+      text: async () =>
+        JSON.stringify({ status: 'CREATED', release_id: 12, release_code: 'LR12', release_name: 'Web 2.5.0', release_status: 'APPROVED', created: { tasks: 2, files: 3 }, slots: { app: 'https://ci/app.zip' } }),
     }),
   );
 
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.status, 201);
   assert.ok(state.secrets.includes('apikey-1234'));
-  assert.strictEqual(state.outputs['release-id'], '12');
+  assert.strictEqual(state.outputs['release-id'], '12'); // machine output kept for back-compat
+  assert.strictEqual(state.outputs['release-code'], 'LR12'); // LT-9310
+  assert.strictEqual(state.outputs['release-name'], 'Web 2.5.0');
   assert.strictEqual(state.outputs['status'], 'CREATED');
   assert.strictEqual(state.outputs['created'], JSON.stringify({ tasks: 2, files: 3 }));
   assert.strictEqual(state.failed, null);
   assert.ok(state.info.some((l) => /LynxTrac Deploy/.test(l)));
+  // LT-9312 — the pre-request log shows only the base URL, never the deploy API path.
+  const triggerLog = state.info.find((l) => /deploy trigger ->/.test(l));
+  assert.ok(triggerLog && /https:\/\/beta\.lynxtrac\.com/.test(triggerLog));
+  assert.ok(!state.info.some((l) => /\/api\/external\/deploy\/release/.test(l)), 'never logs the API path');
+});
+
+test('processTrigger: LT-9312 redacts the API key if a backend error body echoes it', async () => {
+  const { reporter, state } = makeReporter();
+  await processTrigger(
+    validInputs,
+    reporter,
+    async () => ({
+      ok: false,
+      status: 500,
+      text: async () => JSON.stringify({ message: 'upstream rejected key apikey-1234 outright' }),
+    }),
+  );
+  assert.ok(state.failed, 'failure surfaced');
+  assert.ok(!/apikey-1234/.test(state.failed), 'the API key must not appear in the failure output');
+  assert.match(state.failed, /\*\*\*/);
 });
 
 test('processTrigger: non-2xx reports a typed failure and returns ok:false', async () => {

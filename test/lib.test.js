@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const {
   resolveServerUrl,
+  toBaseUrl,
   isValidApiKey,
   isValidVersion,
   parseJsonInput,
@@ -213,10 +214,12 @@ test('buildRequest: no off-domain warning for localhost (dev)', () => {
   assert.ok(!warnings.some((w) => /not a lynxtrac\.com domain/.test(w)));
 });
 
-test('formatDeploySummary: renders a detailed multi-line report', () => {
+test('formatDeploySummary: renders a detailed multi-line report (code+name, base URL, no DB id)', () => {
   const data = {
     status: 'CREATED',
-    release_id: 190,
+    release_id: 190, // present in the body but must NOT be shown (LT-9312)
+    release_code: 'LR190',
+    release_name: 'Web 2.5.0',
     release_status: 'APPROVED',
     version: '0.7.0',
     created: { tasks: 2, files: 3 },
@@ -246,23 +249,49 @@ test('formatDeploySummary: renders a detailed multi-line report', () => {
       extra: ['db-migrate_config'],
     },
   };
-  const out = formatDeploySummary(data, { url: 'https://beta.lynxtrac.com', environment: 'beta' });
+  // Pass the FULL endpoint to prove the summary strips the API path down to the base URL.
+  const out = formatDeploySummary(data, {
+    url: 'https://beta.lynxtrac.com/api/external/deploy/release',
+    environment: 'beta',
+  });
   assert.match(out, /LynxTrac Deploy — beta/);
+  assert.match(out, /\(https:\/\/beta\.lynxtrac\.com\)/); // base URL shown
+  assert.ok(!/\/api\/external\/deploy\/release/.test(out), 'never shows the deploy API path (LT-9312)');
   assert.match(out, /Web Production \(LRB12\)/);
-  assert.match(out, /Release #190/);
+  assert.match(out, /Release LR190 "Web 2\.5\.0"/); // code + name, not #id
+  assert.match(out, /status=APPROVED/);
+  assert.ok(!/#190/.test(out) && !/release 190/.test(out), 'never shows the DB id (LT-9312)');
   assert.match(out, /app-0\.7\.0\.zip/);
   assert.match(out, /\[extra\]/); // the extra file is tagged
   assert.match(out, /Extra: db-migrate_config/);
   assert.match(out, /Rollout: triggered/);
-  assert.match(out, /CREATED: release 190/);
+  assert.match(out, /CREATED: LR190 "Web 2\.5\.0" \(APPROVED\)/);
 });
 
 test('formatDeploySummary: degrades gracefully without a report (idempotent re-run)', () => {
   const out = formatDeploySummary(
-    { status: 'ALREADY_EXISTS', release_id: 5, release_status: 'APPROVED', version: '1.0.0' },
+    { status: 'ALREADY_EXISTS', release_id: 5, release_code: 'LR5', release_name: '1.0.0', release_status: 'APPROVED', version: '1.0.0' },
     { url: 'https://app.lynxtrac.com', environment: '' },
   );
   assert.match(out, /LynxTrac Deploy — production/);
   assert.match(out, /idempotent/);
-  assert.match(out, /release 5/);
+  assert.match(out, /LR5/);
+  assert.ok(!/release 5/.test(out), 'no DB id even on the idempotent path');
+});
+
+test('toBaseUrl: strips path/query to scheme+host, tolerates junk', () => {
+  assert.strictEqual(toBaseUrl('https://beta.lynxtrac.com/api/external/deploy/release'), 'https://beta.lynxtrac.com');
+  assert.strictEqual(toBaseUrl('http://localhost:5566/api/external/deploy/release?x=1'), 'http://localhost:5566');
+  assert.strictEqual(toBaseUrl('not a url'), 'not a url');
+});
+
+test('buildRequest: sends the CI source (provider) in the body', () => {
+  const { body } = buildRequest({
+    apikey: 'apikey-123',
+    blueprint: 'web-prod',
+    version: '2.5.0',
+    artifactsRaw: '{}',
+    source: 'bitbucket',
+  });
+  assert.strictEqual(body.source, 'bitbucket');
 });

@@ -26,6 +26,7 @@ async function run({ coreApi = core, fetchApi = fetch } = {}) {
       deployManifestRaw: coreApi.getInput('deploy_manifest'),
       commit: coreApi.getInput('commit') || process.env.GITHUB_SHA || '',
       branch: coreApi.getInput('branch') || process.env.GITHUB_REF_NAME || process.env.GITHUB_REF || '',
+      source: 'github', // LT-9308 — CI provider, persisted with the release for provenance.
     };
 
     const reporter = {

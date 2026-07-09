@@ -54,6 +54,7 @@ async function run({
       deployManifestRaw: env.DEPLOY_MANIFEST || '',
       commit: env.COMMIT || env.BITBUCKET_COMMIT || '',
       branch: env.BRANCH || env.BITBUCKET_BRANCH || '',
+      source: 'bitbucket', // LT-9308 — CI provider, persisted with the release for provenance.
     };
 
     await processTrigger(inputs, reporter, fetchApi);
