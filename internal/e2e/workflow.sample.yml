@@ -1,0 +1,26 @@
+# INTERNAL E2E HARNESS — maintainer-only. Not part of the action's public surface.
+#
+# Sample CONSUMING workflow: shows the action used as a CI step (the `workflow -> action` half of
+# the E2E flow). For an offline action -> backend test, use run-local.sh against mock-backend.js.
+# This file is illustrative — it is not run by CI in this repo.
+
+name: internal-e2e-sample
+
+on:
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger deploy (action under test, from this checkout)
+        uses: ./
+        with:
+          apikey: ${{ secrets.LYNXTRAC_TEST_API_KEY }}
+          trigger_environment: 'qa'
+          blueprint: 'web-prod'
+          version: '0.0.0-e2e.${{ github.run_number }}'
+          artifacts: |
+            { "app-bundle": "https://ci.example.com/app-e2e.zip" }

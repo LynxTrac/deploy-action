@@ -1,0 +1,33 @@
+{
+  "name": "lynxtrac-deploy-action",
+  "version": "1.0.0",
+  "description": "Register a LynxTrac release from a CI pipeline (GitHub Actions or Bitbucket Pipelines) via a deployment blueprint.",
+  "main": "dist/index.js",
+  "bin": {
+    "lynxtrac-deploy": "src/bitbucket.js"
+  },
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "ncc build src/github.js -o dist --minify --license licenses.txt",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "keywords": [
+    "lynxtrac",
+    "deploy",
+    "github-actions",
+    "bitbucket-pipelines",
+    "ci-cd"
+  ],
+  "author": "LynxTrac",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@actions/core": "^1.11.1"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.3"
+  }
+}

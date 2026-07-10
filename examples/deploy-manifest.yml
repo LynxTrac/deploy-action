@@ -1,0 +1,25 @@
+# Example: the same trigger using the single `deploy_manifest` JSON object instead of named inputs.
+
+name: register-with-deploy-manifest
+
+on:
+  workflow_dispatch:
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Register LynxTrac release (deploy_manifest)
+        uses: LynxTrac/deploy-action@v1
+        with:
+          apikey: ${{ secrets.LYNXTRAC_API_KEY }}
+          trigger_environment: 'beta'
+          deploy_manifest: |
+            {
+              "blueprint": "web-prod",
+              "version": "2.5.0",
+              "artifacts": {
+                "app-bundle": "https://your-ci/artifacts/app-2.5.0.zip"
+              },
+              "release": { "name": "Web 2.5.0", "description": "CI build" }
+            }
