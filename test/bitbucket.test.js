@@ -51,6 +51,7 @@ test('bitbucket: reads env vars, posts, and succeeds without setting an exit cod
   assert.strictEqual(state.errors.length, 0);
   assert.strictEqual(sent.url, 'https://beta.lynxtrac.com/api/external/deploy/release');
   assert.strictEqual(sent.body.blueprint, 'web-prod');
+  assert.strictEqual(sent.body.source, 'bitbucket', 'sends the CI provider for provenance (LT-9308)');
   assert.ok(state.logs.some((l) => /LynxTrac Deploy/.test(l)), 'prints the detailed summary');
 });
 

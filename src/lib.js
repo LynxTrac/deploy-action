@@ -98,7 +98,7 @@ function mergeInputs(named, manifest) {
  * @returns {{ url: string, headers: object, body: object, warnings: string[] }}
  */
 function buildRequest(inputs) {
-  const { apikey, triggerEnvironment, commit, branch } = inputs;
+  const { apikey, triggerEnvironment, commit, branch, source } = inputs;
   const warnings = [];
 
   if (!isValidApiKey(apikey)) {
@@ -175,6 +175,9 @@ function buildRequest(inputs) {
   if (branch) {
     body.branch = normalizeRef(branch);
   }
+  if (source) {
+    body.source = source; // LT-9308 — CI provider (github | bitbucket), persisted for provenance.
+  }
 
   return {
     url,
@@ -182,6 +185,18 @@ function buildRequest(inputs) {
     body,
     warnings,
   };
+}
+
+/**
+ * Reduce a URL to its base (scheme + host), dropping any path/query. LT-9312 — workflow output may
+ * expose only the base URL, never the deploy API path. Returns the input unchanged if it can't parse.
+ */
+function toBaseUrl(url) {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
+  }
 }
 
 /**
@@ -198,7 +213,13 @@ function formatDeploySummary(data = {}, ctx = {}) {
   const report = data.report || null;
   const lines = [];
 
-  lines.push(`LynxTrac Deploy — ${environment || 'production'}${url ? `  (${url})` : ''}`);
+  // LT-9312 — display only the base URL (scheme+host), never the deploy API path.
+  const displayUrl = toBaseUrl(url);
+  // LT-9310/9312 — identify the release by code + name, never the internal DB id.
+  const releaseLabel =
+    [data.release_code, data.release_name ? `"${data.release_name}"` : ''].filter(Boolean).join(' ') || '-';
+
+  lines.push(`LynxTrac Deploy — ${environment || 'production'}${displayUrl ? `  (${displayUrl})` : ''}`);
 
   if (report && report.blueprint) {
     const bp = report.blueprint;
@@ -216,8 +237,7 @@ function formatDeploySummary(data = {}, ctx = {}) {
   const idem = data.status === 'ALREADY_EXISTS' ? 'idempotent — no change' : data.healed ? 'healed' : 'new';
   lines.push('');
   lines.push(
-    `> Release #${data.release_id != null ? data.release_id : '?'}   ` +
-      `status=${data.release_status || '-'}   source=CI_PIPELINE   (${idem})`,
+    `> Release ${releaseLabel}   ` + `status=${data.release_status || '-'}   source=CI_PIPELINE   (${idem})`,
   );
 
   if (report && Array.isArray(report.tasks) && report.tasks.length) {
@@ -255,7 +275,7 @@ function formatDeploySummary(data = {}, ctx = {}) {
   const counts = data.created || (report && report.counts) || {};
   lines.push('');
   lines.push(
-    `${data.status || 'OK'}: release ${data.release_id != null ? data.release_id : '?'} ` +
+    `${data.status || 'OK'}: ${releaseLabel} ` +
       `(${data.release_status || '-'}) — ${counts.tasks != null ? counts.tasks : '?'} tasks, ` +
       `${counts.files != null ? counts.files : '?'} files.`,
   );
@@ -266,6 +286,7 @@ function formatDeploySummary(data = {}, ctx = {}) {
 module.exports = {
   SERVER_ALIASES,
   resolveServerUrl,
+  toBaseUrl,
   isValidApiKey,
   isValidVersion,
   parseJsonInput,

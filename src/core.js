@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildRequest, formatDeploySummary } = require('./lib');
+const { buildRequest, formatDeploySummary, toBaseUrl } = require('./lib');
 
 /**
  * LT-9216 — common processing unit shared by every CI provider entry point.
@@ -30,7 +30,13 @@ async function processTrigger(inputs, reporter, fetchApi = fetch) {
   const { url, headers, body, warnings } = buildRequest(inputs);
   warnings.forEach((w) => reporter.warning(w));
 
-  reporter.info(`LynxTrac deploy trigger -> ${url} (blueprint=${body.blueprint}, version=${body.version})`);
+  // LT-9312 — never print the deploy API path; the base URL (scheme+host) is the most that is shown.
+  const baseUrl = toBaseUrl(url);
+  // LT-9312 — redact the API key from any surfaced backend text (defence for providers without a
+  // log-masking API, e.g. Bitbucket, should a backend error body ever reflect the key).
+  const redactKey = (value) => (value && inputs.apikey ? String(value).split(inputs.apikey).join('***') : value);
+
+  reporter.info(`LynxTrac deploy trigger -> ${baseUrl} (blueprint=${body.blueprint}, version=${body.version})`);
 
   const response = await fetchApi(url, { method: 'POST', headers, body: JSON.stringify(body) });
   const text = await response.text();
@@ -59,16 +65,25 @@ async function processTrigger(inputs, reporter, fetchApi = fetch) {
   if (data.slots) {
     reporter.setOutput('slots', JSON.stringify(data.slots));
   }
+  // LT-9310 — friendly release identifiers as machine outputs (the DB id output is kept for back-compat).
+  if (data.release_code) {
+    reporter.setOutput('release-code', data.release_code);
+  }
+  if (data.release_name) {
+    reporter.setOutput('release-name', data.release_name);
+  }
 
   if (!response.ok) {
     const code = data.code ? ` [${data.code}]` : '';
-    reporter.setFailed(`LynxTrac deploy failed (HTTP ${response.status})${code}: ${data.message || text || 'no body'}`);
+    reporter.setFailed(
+      `LynxTrac deploy failed (HTTP ${response.status})${code}: ${redactKey(data.message) || redactKey(text) || 'no body'}`,
+    );
     return { ok: false, status: response.status, data };
   }
 
   // Detailed, multi-line success summary: blueprint/version banner, per-task/file breakdown,
   // resolved/omitted/extra slots, and rollout status — identical for GitHub and Bitbucket.
-  reporter.info(formatDeploySummary(data, { url, environment: inputs.triggerEnvironment }));
+  reporter.info(formatDeploySummary(data, { url: baseUrl, environment: inputs.triggerEnvironment }));
   return { ok: true, status: response.status, data };
 }
 

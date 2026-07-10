@@ -16,10 +16,11 @@ pipelines:
         name: Register LynxTrac release
         script:
           - npm install git+https://github.com/LynxTrac/deploy-action.git
-          # optional TRIGGER_ENVIRONMENT come from Repository variables.
+          # APIKEY comes from a secured Repository variable (masked in logs) — never inline it in a
+          # shared/prod pipeline. Optional TRIGGER_ENVIRONMENT is a Repository variable too.
           # commit/branch auto-fill from Bitbucket's BITBUCKET_COMMIT / BITBUCKET_BRANCH.
           - >
-            APIKEY='1q2w3e4r5t'
+            APIKEY="$LYNXTRAC_API_KEY"
             BLUEPRINT='LRB12'
             VERSION='2.5.0'
             ARTIFACTS='{ "app-bundle": "https://your-ci/artifacts/app-2.5.0.zip", "db-migrate": "https://your-ci/artifacts/migrate-2.5.0.sql" }'

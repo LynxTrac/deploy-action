@@ -104,4 +104,5 @@ test('run: reads snake_case inputs (release_name, deploy_manifest) and sends the
   });
   assert.strictEqual(state.failed, null);
   assert.strictEqual(sentBody.release_name, 'Web 2.5.0');
+  assert.strictEqual(sentBody.source, 'github', 'sends the CI provider for provenance (LT-9308)');
 });

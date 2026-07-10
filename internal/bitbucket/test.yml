@@ -14,8 +14,9 @@ pipelines:
         name: Register LynxTrac release
         script:
           - npm install git+https://github.com/LynxTrac/deploy-action.git
+          # APIKEY comes from a secured Repository variable (masked in logs) — set it before running.
           - >
-            APIKEY='1q2w3e4r5t'
+            APIKEY="$LYNXTRAC_API_KEY"
             BLUEPRINT='Bp1'
             VERSION='1.0.0'
             ARTIFACTS='{ "lh99_f1": "<<LINK_GOES_HERE>>" }'

@@ -47,7 +47,11 @@ inputs:
 
 outputs:
   release-id:
-    description: 'ID of the created (or already-existing) release.'
+    description: 'Internal ID of the created (or already-existing) release. Kept for back-compat; never printed in the workflow log.'
+  release-code:
+    description: 'Release code (e.g. LR1234) — the friendly identifier shown in the workflow log.'
+  release-name:
+    description: 'Human-readable release name.'
   status:
     description: 'CREATED | ALREADY_EXISTS | VALIDATION_FAILED.'
   release-status:
