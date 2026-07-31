@@ -36,6 +36,16 @@ inputs:
       { "blueprint": "...", "version": "...", "artifacts": { ... }, "release": { "name": "...", "description": "..." } }.
       If both a named input and the same deploy_manifest field are provided, the named input wins.
     required: false
+  segment:
+    description: >-
+      Multi-source blueprint (Blueprint Streams) only: the blueprint task CODE this trigger contributes to
+      the shared release version. Omit for a normal single-trigger blueprint.
+    required: false
+  auto_approve:
+    description: >-
+      Approve the release once it is complete? Omit to use the blueprint's default. Set to 'false' to
+      create the release (or contribute a segment) without approving it.
+    required: false
   commit:
     description: 'Commit SHA for provenance (defaults to the triggering commit).'
     required: false
@@ -53,7 +63,7 @@ outputs:
   release-name:
     description: 'Human-readable release name.'
   status:
-    description: 'CREATED | ALREADY_EXISTS | VALIDATION_FAILED.'
+    description: 'CREATED | ASSEMBLING | ALREADY_EXISTS | VALIDATION_FAILED | CONFLICT.'
   release-status:
     description: 'Lifecycle status of the created release (e.g. APPROVED).'
   created:

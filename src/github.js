@@ -24,6 +24,9 @@ async function run({ coreApi = core, fetchApi = fetch } = {}) {
       releaseName: coreApi.getInput('release_name'),
       description: coreApi.getInput('description'),
       deployManifestRaw: coreApi.getInput('deploy_manifest'),
+      // LT-9925 — multi-source (Blueprint Streams) assembly inputs; ignored by SINGLE blueprints.
+      segment: coreApi.getInput('segment'),
+      autoApproveRaw: coreApi.getInput('auto_approve'),
       commit: coreApi.getInput('commit') || process.env.GITHUB_SHA || '',
       branch: coreApi.getInput('branch') || process.env.GITHUB_REF_NAME || process.env.GITHUB_REF || '',
       source: 'github', // LT-9308 — CI provider, persisted with the release for provenance.
