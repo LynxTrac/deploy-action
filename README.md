@@ -42,6 +42,8 @@ blueprint in LynxTrac and use **Preview → Copy YAML** to generate this block w
 | `release_name` | | Human-readable release name (defaults to the version). |
 | `description` | | Release description. |
 | `deploy_manifest` | | Alias: one JSON object `{ blueprint, version, artifacts, release: { name, description } }`. Named inputs win if both are set. |
+| `segment` | | **Multi-source blueprints only.** The blueprint task **code** this pipeline contributes to the shared release version. Omit for a normal (single-trigger) blueprint. See [Multi-source assembly](#multi-source-assembly-blueprint-streams). |
+| `auto_approve` | | Approve the release once it is complete? Omit to use the blueprint's default; set to `false` to create (or contribute a segment) **without** approving it (no rollout fires — approve later in the console). |
 | `commit` | | Commit SHA for provenance (defaults to the triggering commit). |
 | `branch` | | Branch/ref for provenance (defaults to the triggering ref). |
 
@@ -50,7 +52,7 @@ blueprint in LynxTrac and use **Preview → Copy YAML** to generate this block w
 | Output | Description |
 |---|---|
 | `release-id` | ID of the created (or already-existing) release. |
-| `status` | `CREATED` \| `ALREADY_EXISTS` \| `VALIDATION_FAILED`. |
+| `status` | `CREATED` \| `ASSEMBLING` \| `ALREADY_EXISTS` \| `VALIDATION_FAILED` \| `CONFLICT`. |
 | `release-status` | Release lifecycle status — `APPROVED` after a successful trigger. |
 | `created` | JSON `{ tasks, files }` counts created. |
 | `slots` | JSON map of resolved `slot_key -> link`. |
@@ -115,10 +117,59 @@ If you prefer a single JSON blob, use `deploy_manifest` instead of the named inp
 
 (On Bitbucket, pass the same JSON via the `DEPLOY_MANIFEST` environment variable.)
 
+## Multi-source assembly (Blueprint Streams)
+
+A **multi-source** blueprint assembles ONE release version from several independent pipelines — each
+contributing one blueprint task (a **segment**), identified by its task `code`. Use it when a product's
+release is built from several repositories/pipelines.
+
+- Every pipeline sends the **same** `blueprint` + `version`, plus its own `segment` (the task code) and only
+  that segment's `artifacts`.
+- Triggers can run in any order, even days apart. The release is created **incomplete** on the first trigger
+  and completes once every expected segment has been contributed.
+- On completion the release is auto-approved (and any configured rollout fires) **unless** you pass
+  `auto_approve: 'false'`, in which case it waits for a manual approval in the console.
+- Re-running a pipeline is safe (idempotent). Adding a **new** segment to an already-approved release — or a
+  version already owned by a different/manual release — is rejected with a clear `CONFLICT`.
+- A later trigger for a segment that already exists can **add files** to it (when the blueprint allows extra
+  files, or to fill a slot omitted earlier under "allow missing files").
+
+Example — three repositories, one release `2.5.0` (blueprint `LRB12` with task codes `app`, `db`, `web`).
+Give each repository's pipeline its own snippet (the blueprint editor's **Copy CI YAML** generates one per
+segment):
+
+```yaml
+# 'app' repository pipeline
+- uses: LynxTrac/deploy-action@v1
+  with:
+    apikey: ${{ secrets.LYNXTRAC_API_KEY }}
+    blueprint: 'LRB12'
+    version: '2.5.0'
+    segment: 'app'
+    artifacts: |
+      { "app-bundle": "https://your-ci/app-2.5.0.zip" }
+```
+
+```yaml
+# 'db' repository pipeline — same blueprint + version, segment 'db', only its slots
+- uses: LynxTrac/deploy-action@v1
+  with:
+    apikey: ${{ secrets.LYNXTRAC_API_KEY }}
+    blueprint: 'LRB12'
+    version: '2.5.0'
+    segment: 'db'
+    artifacts: |
+      { "db-migrate": "https://your-ci/migrate-2.5.0.sql" }
+```
+
+The `web` pipeline follows the same shape with `segment: 'web'`. When the last of the three runs, release
+`2.5.0` is complete and (by default) approved.
+
 ## Idempotency
 
-Re-running the same build is safe. A release is unique per `(vendor, product, version)`; a repeat
-call returns `status: ALREADY_EXISTS` with the existing `release-id` and creates nothing new.
+Re-running the same build is safe. A single-trigger release is unique per `(vendor, product, version)`; a
+repeat call returns `status: ALREADY_EXISTS` with the existing `release-id` and creates nothing new. For a
+multi-source blueprint, re-sending a segment that is already present is likewise a no-op.
 
 ## Selecting an environment (`trigger_environment`)
 

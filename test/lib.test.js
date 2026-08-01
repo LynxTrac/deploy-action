@@ -8,6 +8,7 @@ const {
   isValidApiKey,
   isValidVersion,
   parseJsonInput,
+  parseBoolInput,
   normalizeRef,
   mergeInputs,
   buildRequest,
@@ -294,4 +295,77 @@ test('buildRequest: sends the CI source (provider) in the body', () => {
     source: 'bitbucket',
   });
   assert.strictEqual(body.source, 'bitbucket');
+});
+
+test('parseBoolInput: true/false-ish strings, empty/unknown -> undefined', () => {
+  assert.strictEqual(parseBoolInput('true'), true);
+  assert.strictEqual(parseBoolInput('YES'), true);
+  assert.strictEqual(parseBoolInput('false'), false);
+  assert.strictEqual(parseBoolInput('0'), false);
+  assert.strictEqual(parseBoolInput(''), undefined);
+  assert.strictEqual(parseBoolInput('maybe'), undefined);
+});
+
+test('buildRequest (LT-9925): sends segment and auto_approve when provided', () => {
+  const { body } = buildRequest({
+    apikey: 'apikey-123',
+    blueprint: 'web-prod',
+    version: '2.5.0',
+    artifactsRaw: '{"app":"https://ci/app.zip"}',
+    segment: 'app-deploy',
+    autoApproveRaw: 'false',
+  });
+  assert.strictEqual(body.segment, 'app-deploy');
+  assert.strictEqual(body.auto_approve, false);
+});
+
+test('buildRequest (LT-9925): omits segment/auto_approve when not supplied', () => {
+  const { body } = buildRequest({
+    apikey: 'apikey-123',
+    blueprint: 'web-prod',
+    version: '2.5.0',
+    artifactsRaw: '{}',
+  });
+  assert.ok(!('segment' in body));
+  assert.ok(!('auto_approve' in body));
+});
+
+test('buildRequest (LT-9925): segment/auto_approve via deploy_manifest', () => {
+  const { body } = buildRequest({
+    apikey: 'apikey-123',
+    deployManifestRaw: JSON.stringify({
+      blueprint: 'web-prod',
+      version: '2.5.0',
+      artifacts: {},
+      segment: 'db-migrate',
+      auto_approve: true,
+    }),
+  });
+  assert.strictEqual(body.segment, 'db-migrate');
+  assert.strictEqual(body.auto_approve, true);
+});
+
+test('formatDeploySummary (LT-9925): renders multi-source assembly progress', () => {
+  const out = formatDeploySummary(
+    {
+      status: 'ASSEMBLING',
+      release_code: 'LR20',
+      release_name: '2.5.0',
+      release_status: 'REQUESTED',
+      version: '2.5.0',
+      message:
+        "Added segment 'app-deploy' (2 file(s)) to release '2.5.0'. Still INCOMPLETE; 1/3 segments present. Awaiting: db-migrate, api.",
+      assembly: {
+        state: 'INCOMPLETE',
+        complete: false,
+        present: ['app-deploy'],
+        expected: ['app-deploy', 'db-migrate', 'api'],
+        missing: ['db-migrate', 'api'],
+      },
+    },
+    { url: 'https://beta.lynxtrac.com/api/external/deploy/release', environment: 'beta' },
+  );
+  assert.match(out, /Assembly\s*:\s*INCOMPLETE\s+\(1\/3 segments\)/);
+  assert.match(out, /Awaiting: db-migrate, api/);
+  assert.match(out, /ASSEMBLING: LR20/);
 });

@@ -69,6 +69,21 @@ function parseJsonInput(raw, label) {
   }
 }
 
+/** Parse an optional boolean-ish input ('true'/'false'/'1'/'0'/'yes'/'no'); undefined when empty/unknown. */
+function parseBoolInput(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return undefined;
+  }
+  const v = String(raw).trim().toLowerCase();
+  if (['true', '1', 'yes', 'on'].includes(v)) {
+    return true;
+  }
+  if (['false', '0', 'no', 'off'].includes(v)) {
+    return false;
+  }
+  return undefined; // unrecognized -> treat as unset (backend falls back to the blueprint default)
+}
+
 /** Strip a refs/heads|tags/ prefix from a git ref. */
 function normalizeRef(ref) {
   if (!ref) {
@@ -90,6 +105,9 @@ function mergeInputs(named, manifest) {
     artifacts: named.artifacts !== undefined ? named.artifacts : m.artifacts || {},
     releaseName: named.releaseName || mRelease.name || m.release_name || '',
     description: named.description || mRelease.description || m.description || '',
+    // LT-9925 — multi-source (Blueprint Streams) assembly extras.
+    segment: named.segment || m.segment || '',
+    autoApprove: named.autoApprove !== undefined ? named.autoApprove : m.auto_approve,
   };
 }
 
@@ -111,6 +129,9 @@ function buildRequest(inputs) {
     artifacts: parseJsonInput(inputs.artifactsRaw, 'artifacts'),
     releaseName: (inputs.releaseName || '').trim(),
     description: (inputs.description || '').trim(),
+    // LT-9925 — multi-source (Blueprint Streams) assembly.
+    segment: (inputs.segment || '').trim(),
+    autoApprove: parseBoolInput(inputs.autoApproveRaw),
   };
 
   const manifest = parseJsonInput(inputs.deployManifestRaw, 'deploy_manifest');
@@ -178,6 +199,14 @@ function buildRequest(inputs) {
   if (source) {
     body.source = source; // LT-9308 — CI provider (github | bitbucket), persisted for provenance.
   }
+  // LT-9925 — multi-source (Blueprint Streams): the blueprint segment this trigger contributes and whether
+  // to auto-approve on completion. The backend ignores both for SINGLE blueprints.
+  if (merged.segment) {
+    body.segment = merged.segment;
+  }
+  if (merged.autoApprove !== undefined) {
+    body.auto_approve = Boolean(merged.autoApprove);
+  }
 
   return {
     url,
@@ -240,6 +269,21 @@ function formatDeploySummary(data = {}, ctx = {}) {
     `> Release ${releaseLabel}   ` + `status=${data.release_status || '-'}   source=CI_PIPELINE   (${idem})`,
   );
 
+  // LT-9925 — multi-source (Blueprint Streams) assembly progress (present only for MULTI_SOURCE blueprints).
+  if (data.assembly) {
+    const a = data.assembly;
+    const present = (a.present || []).length;
+    const expected = (a.expected || []).length;
+    lines.push('');
+    lines.push(
+      `Assembly  : ${a.state || '-'}   (${present}/${expected} segments)` +
+        (a.missing && a.missing.length ? `   Awaiting: ${a.missing.join(', ')}` : ''),
+    );
+    if (data.message) {
+      lines.push(`  ${data.message}`);
+    }
+  }
+
   if (report && Array.isArray(report.tasks) && report.tasks.length) {
     const counts = report.counts || data.created || {};
     lines.push('');
@@ -290,6 +334,7 @@ module.exports = {
   isValidApiKey,
   isValidVersion,
   parseJsonInput,
+  parseBoolInput,
   normalizeRef,
   mergeInputs,
   buildRequest,

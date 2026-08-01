@@ -12,7 +12,7 @@ const { assertSupportedNode } = require('./node-version');
  * inputs arrive as environment variables (set as Repository/Deployment variables in Bitbucket):
  *
  *   APIKEY, TRIGGER_ENVIRONMENT, BLUEPRINT, VERSION, ARTIFACTS,
- *   RELEASE_NAME, DESCRIPTION, DEPLOY_MANIFEST
+ *   RELEASE_NAME, DESCRIPTION, DEPLOY_MANIFEST, SEGMENT, AUTO_APPROVE
  *
  * Commit/branch provenance auto-fill from Bitbucket's built-in BITBUCKET_COMMIT / BITBUCKET_BRANCH.
  *
@@ -52,6 +52,9 @@ async function run({
       releaseName: env.RELEASE_NAME || '',
       description: env.DESCRIPTION || '',
       deployManifestRaw: env.DEPLOY_MANIFEST || '',
+      // LT-9925 — multi-source (Blueprint Streams) assembly inputs; ignored by SINGLE blueprints.
+      segment: env.SEGMENT || '',
+      autoApproveRaw: env.AUTO_APPROVE || '',
       commit: env.COMMIT || env.BITBUCKET_COMMIT || '',
       branch: env.BRANCH || env.BITBUCKET_BRANCH || '',
       source: 'bitbucket', // LT-9308 — CI provider, persisted with the release for provenance.
